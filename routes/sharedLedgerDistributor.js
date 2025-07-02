@@ -14,16 +14,6 @@ router.get('/', async (req, res) => {
   console.log('🔎 DistributorName:', distributorName);
 
   try {
-    // Fetch freshness records linked to transactions where distributor is end_user
-    const freshnessResult = await pool.query(
-      `SELECT pr.*
-       FROM process_records pr
-       JOIN transactions t ON pr.product_id = t.product_id
-       WHERE t.end_user ILIKE $1
-       ORDER BY pr.created_at DESC`,
-      [distributorName]
-    );
-
     // Fetch transactions linked to this distributor as end user
     const transactionResult = await pool.query(
       `SELECT t.id, t.transaction_id, t.product_id, t.amount, t.freshness, t.end_user,
@@ -36,7 +26,7 @@ router.get('/', async (req, res) => {
        ORDER BY t.created_at DESC`,
       [distributorName]
     );
-    // Filter invalid transaction rows
+
     const cleanTransactions = transactionResult.rows.filter(row =>
       typeof row.transaction_id === 'string' &&
       typeof row.product_id === 'string' &&
@@ -46,15 +36,23 @@ router.get('/', async (req, res) => {
       typeof row.expiry_date === 'string'
     );
 
-    // Optional debug log
-    console.log('✅ Clean Transactions:', cleanTransactions);
-    console.log('✅ Freshness Records:', freshnessResult.rows);
+    // Extract product_ids already used in transactions
+    const transactedProductIds = new Set(cleanTransactions.map(tx => tx.product_id));
+
+    // Fetch freshness records NOT in transaction product_ids
+    const freshnessResult = await pool.query(
+      `SELECT pr.*
+       FROM process_records pr
+       WHERE pr.product_id NOT IN (${[...transactedProductIds].map((_, i) => `$${i + 2}`).join(',')})
+       ORDER BY pr.created_at DESC`,
+      [distributorName, ...transactedProductIds]
+    );
 
     res.json({
       freshnessRecords: freshnessResult.rows.map(r => ({ ...r, __type: 'freshness' })),
       transactions: cleanTransactions.map(r => ({ ...r, __type: 'transaction' }))
     });
-    
+
   } catch (error) {
     console.error('❌ Error fetching shared ledger data:', error.message);
     res.status(500).json({ error: 'Internal server error' });
