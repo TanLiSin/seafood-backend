@@ -3,6 +3,7 @@ import pool from '../db.js';
 
 const router = Router();
 
+// GET shared ledger data for distributor
 router.get('/', async (req, res) => {
   const { distributorName } = req.query;
 
@@ -13,7 +14,7 @@ router.get('/', async (req, res) => {
   console.log('🔎 DistributorName:', distributorName);
 
   try {
-    // Get all transaction records
+    // Fetch transactions where distributor is the end user
     const transactionResult = await pool.query(
       `SELECT t.id, t.transaction_id, t.product_id, t.amount, t.freshness, t.end_user,
               s.username AS sender, s.phone_no AS sender_phone, s.email AS sender_email,
@@ -35,22 +36,15 @@ router.get('/', async (req, res) => {
       typeof row.expiry_date === 'string'
     );
 
-    const transactedProductIds = new Set(cleanTransactions.map(tx => tx.product_id));
-
-    let freshnessResult;
-
-    if (transactedProductIds.size === 0) {
-      // No matching freshness if no transactions
-      freshnessResult = await pool.query(`SELECT * FROM process_records WHERE 1=0`);
-    } else {
-      freshnessResult = await pool.query(
-        `SELECT pr.*
-         FROM process_records pr
-         WHERE pr.product_id IN (${[...transactedProductIds].map((_, i) => `$${i + 1}`).join(',')})
-         ORDER BY pr.created_at DESC`,
-        [...transactedProductIds]
-      );
-    }
+    // Fetch matching freshness records using JOIN
+    const freshnessResult = await pool.query(
+      `SELECT pr.*
+       FROM process_records pr
+       JOIN transactions t ON pr.product_id = t.product_id
+       WHERE t.end_user ILIKE $1
+       ORDER BY pr.created_at DESC`,
+      [distributorName]
+    );
 
     res.json({
       freshnessRecords: freshnessResult.rows.map(r => ({ ...r, __type: 'freshness' })),
