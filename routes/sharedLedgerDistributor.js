@@ -49,10 +49,10 @@ router.get('/', async (req, res) => {
     // Optional debug log
     console.log('✅ Clean Transactions:', cleanTransactions);
     console.log('✅ Freshness Records:', freshnessResult.rows);
-    
+
     res.json({
       freshnessRecords: freshnessResult.rows.map(r => ({ ...r, __type: 'freshness' })),
-      transactions: transactionResult.rows.map(r => ({ ...r, __type: 'transaction' }))
+      transactions: cleanTransactions.map(r => ({ ...r, __type: 'transaction' }))
     });
     
   } catch (error) {
