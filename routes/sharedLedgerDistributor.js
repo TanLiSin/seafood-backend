@@ -36,13 +36,13 @@ router.get('/', async (req, res) => {
       typeof row.expiry_date === 'string'
     );
 
-    // Fetch matching freshness records using JOIN
+    // Fetch distinct freshness records per product_id using JOIN
     const freshnessResult = await pool.query(
-      `SELECT pr.*
+      `SELECT DISTINCT ON (pr.product_id) pr.*
        FROM process_records pr
        JOIN transactions t ON pr.product_id = t.product_id
        WHERE t.end_user ILIKE $1
-       ORDER BY pr.created_at DESC`,
+       ORDER BY pr.product_id, pr.created_at DESC`,
       [distributorName]
     );
 
