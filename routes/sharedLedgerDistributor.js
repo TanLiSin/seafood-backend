@@ -38,9 +38,10 @@ router.get('/', async (req, res) => {
     );
 
     res.json({
-      freshnessRecords: freshnessResult.rows,
-      transactions: transactionResult.rows
+      freshnessRecords: freshnessResult.rows.map(r => ({ ...r, __type: 'freshness' })),
+      transactions: transactionResult.rows.map(r => ({ ...r, __type: 'transaction' }))
     });
+    
   } catch (error) {
     console.error('❌ Error fetching shared ledger data:', error.message);
     res.status(500).json({ error: 'Internal server error' });
