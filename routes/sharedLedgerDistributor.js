@@ -36,7 +36,20 @@ router.get('/', async (req, res) => {
        ORDER BY t.created_at DESC`,
       [distributorName]
     );
+    // Filter invalid transaction rows
+    const cleanTransactions = transactionResult.rows.filter(row =>
+      typeof row.transaction_id === 'string' &&
+      typeof row.product_id === 'string' &&
+      typeof row.freshness === 'string' &&
+      !isNaN(Number(row.amount)) &&
+      typeof row.created_at === 'string' &&
+      typeof row.expiry_date === 'string'
+    );
 
+    // Optional debug log
+    console.log('✅ Clean Transactions:', cleanTransactions);
+    console.log('✅ Freshness Records:', freshnessResult.rows);
+    
     res.json({
       freshnessRecords: freshnessResult.rows.map(r => ({ ...r, __type: 'freshness' })),
       transactions: transactionResult.rows.map(r => ({ ...r, __type: 'transaction' }))
